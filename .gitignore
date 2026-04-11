@@ -29,6 +29,7 @@ tsconfig.tsbuildinfo
 tmp
 playground
 logs/
+/.logs
 /result
 refs
 a.out
