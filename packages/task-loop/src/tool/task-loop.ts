@@ -83,11 +83,21 @@ export const taskLoopRecord = z.object({
   iteration: z.number().int().min(0),
   max_iterations: z.number().int().min(1),
   description: z.string().min(1),
+  stop_when: taskLoopStopWhen.optional(),
   updated_at: z.number().int().nonnegative(),
   summary: z.string().optional(),
   last_error: z.string().optional(),
   stop_locked: z.boolean().default(false),
 })
+
+function sameStop(a?: z.infer<typeof taskLoopStopWhen>, b?: z.infer<typeof taskLoopStopWhen>) {
+  if (!a && !b) return true
+  if (!a || !b) return false
+  if (a.type !== b.type) return false
+  if (a.type === "model_signal") return true
+  if (b.type === "model_signal") return false
+  return a.value === b.value
+}
 
 export function parseTaskLoopArgs(input: unknown) {
   return taskLoopArgs.parse(input)
@@ -137,6 +147,21 @@ export function validateTaskLoopBoundary(input: unknown, record?: unknown) {
       error: taskLoopError.parse({
         category: "resume_mismatch",
         message: "Resume requires the original task_id and child_session_id pair",
+      }),
+    }
+  }
+
+  if (
+    row.agent !== args.data.agent ||
+    row.description !== args.data.description ||
+    row.max_iterations !== args.data.max_iterations ||
+    !sameStop(row.stop_when, args.data.stop_when)
+  ) {
+    return {
+      ok: false as const,
+      error: taskLoopError.parse({
+        category: "resume_mismatch",
+        message: "Resume args must match the original loop behavior fields",
       }),
     }
   }
