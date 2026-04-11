@@ -1,9 +1,17 @@
-const server = async () => ({})
+import type { Plugin, PluginModule } from "@opencode-ai/plugin"
+import { taskLoopTool } from "./tool/task-loop.js"
 
-const mod = {
-  id: "task-loop",
+const id = "opencode-task-loop"
+
+export const server: Plugin = async () => ({
+  tool: {
+    task_loop: taskLoopTool,
+  },
+})
+
+const mod: PluginModule & { id: string } = {
+  id,
   server,
 }
 
-export { server }
 export default mod

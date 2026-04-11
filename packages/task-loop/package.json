@@ -10,7 +10,14 @@
     "test": "bun test ./src/index.ts --pass-with-no-tests"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/index.ts",
+    "./tui": "./src/tui.ts",
+    "./tool": "./src/tool/task-loop.ts"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"
