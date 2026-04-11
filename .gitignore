@@ -1,31 +1,48 @@
+# OS files
 .DS_Store
-node_modules
-.worktrees
-.sst
-.env
+
+# Editor and tool state
 .idea
 .vscode
 .codex
+.serena/
+**/.serena
+Session.vim
 *~
-playground
-tmp
+
+# Dependency and build outputs
+node_modules
 dist
 ts-dist
 .turbo
-**/.serena
-.serena/
-/result
-refs
-Session.vim
-/opencode.json
-a.out
 target
-.scripts
-.direnv/
-
-# Local dev files
-opencode-dev
-UPCOMING_CHANGELOG.md
-logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Local environment and workspace state
+.env
+.env.local
+.env.*.local
+.direnv/
+.worktrees
+.sst
+tmp
+playground
+logs/
+/result
+refs
+a.out
+
+# OpenCode local and generated files
+/opencode.json
+playwright-outputs/
+.scripts
+opencode-dev
+
+# Fork-local customizations
+.opencode/agents/
+.opencode/skills/
+
+# Repo docs and local notes
+docs/temp
+UPCOMING_CHANGELOG.md
