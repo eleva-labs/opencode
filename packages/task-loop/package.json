@@ -7,13 +7,14 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "typecheck": "bunx tsc --noEmit",
-    "test": "bun test ./src/index.ts --pass-with-no-tests"
+    "test": "bun test --pass-with-no-tests"
   },
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/index.ts",
     "./tui": "./src/tui.ts",
-    "./tool": "./src/tool/task-loop.ts"
+    "./tool": "./src/tool/task-loop.ts",
+    "./package.json": "./package.json"
   },
   "dependencies": {
     "@opencode-ai/plugin": "workspace:*",
