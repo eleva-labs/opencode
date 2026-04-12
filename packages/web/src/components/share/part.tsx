@@ -114,7 +114,9 @@ export function Part(props: PartProps) {
               <Match when={props.part.type === "tool" && props.part.tool === "webfetch"}>
                 <IconGlobeAlt width={18} height={18} />
               </Match>
-              <Match when={props.part.type === "tool" && props.part.tool === "task"}>
+              <Match
+                when={props.part.type === "tool" && (props.part.tool === "task" || props.part.tool === "task_loop")}
+              >
                 <IconRobot width={18} height={18} />
               </Match>
               <Match when={true}>
@@ -264,7 +266,7 @@ export function Part(props: PartProps) {
                       state={props.part.state}
                     />
                   </Match>
-                  <Match when={props.part.tool === "task"}>
+                  <Match when={props.part.tool === "task" || props.part.tool === "task_loop"}>
                     <TaskTool
                       id={props.part.id}
                       tool={props.part.tool}
@@ -701,14 +703,27 @@ function ToolFooter(props: { time: number }) {
 
 function TaskTool(props: ToolProps) {
   const messages = useShareMessages()
+  const title = createMemo(() => (props.tool === "task_loop" ? "Task loop" : "Task"))
+  const target = createMemo(() => {
+    if (typeof props.state.input.description === "string" && props.state.input.description)
+      return props.state.input.description
+    if (typeof props.state.metadata?.description === "string" && props.state.metadata.description)
+      return props.state.metadata.description
+    const id = props.state.metadata?.sessionId ?? props.state.metadata?.child_session_id
+    if (typeof id === "string") return id
+    return ""
+  })
+  const prompt = createMemo(() => props.state.input.prompt ?? props.state.input.initial_prompt ?? "")
 
   return (
     <>
       <div data-component="tool-title">
-        <span data-slot="name">Task</span>
-        <span data-slot="target">{props.state.input.description}</span>
+        <span data-slot="name">{title()}</span>
+        <span data-slot="target">{target()}</span>
       </div>
-      <div data-component="tool-input">&ldquo;{props.state.input.prompt}&rdquo;</div>
+      <Show when={prompt()}>
+        <div data-component="tool-input">&ldquo;{prompt()}&rdquo;</div>
+      </Show>
       <ResultsButton showCopy={messages.show_output} hideCopy={messages.hide_output}>
         <div data-component="tool-output">
           <ContentMarkdown expand text={props.state.output} />

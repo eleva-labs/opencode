@@ -12,6 +12,7 @@ import {
 } from "./tool/task-loop.js"
 
 export * from "./tool/task-loop.js"
+export * from "./tui/index.js"
 
 export const id = "opencode-task-loop"
 

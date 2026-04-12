@@ -46,6 +46,13 @@ const stop = z.object({
 
 const rows = new Map<string, z.infer<typeof taskLoopRecord>>()
 const runs = new Map<string, z.infer<typeof taskLoopActive>>()
+const subs = new Set<() => void>()
+let ver = 0
+
+function touch() {
+  ver += 1
+  for (const sub of subs) sub()
+}
 
 function fail(message: string) {
   return {
@@ -72,6 +79,7 @@ export function setTaskLoopRecord(input: unknown) {
   const prev = rows.get(next.child_session_id)
   const row = patch(next, prev)
   rows.set(row.child_session_id, row)
+  touch()
   return row
 }
 
@@ -81,6 +89,17 @@ export function getTaskLoopRecord(input: unknown) {
 
 export function listTaskLoopRecords() {
   return [...rows.values()].sort((a, b) => b.updated_at - a.updated_at)
+}
+
+export function getTaskLoopStateVersion() {
+  return ver
+}
+
+export function subscribeTaskLoopState(sub: () => void) {
+  subs.add(sub)
+  return () => {
+    subs.delete(sub)
+  }
 }
 
 export function listTaskLoopRuns(input: unknown) {
@@ -100,6 +119,7 @@ export function startTaskLoopRun(input: unknown) {
 
   const active = taskLoopActive.parse(next)
   runs.set(active.child_session_id, active)
+  touch()
   return {
     ok: true as const,
     value: active,
@@ -129,6 +149,7 @@ export function finishTaskLoopRun(input: unknown) {
       recent_runs: sort([next, ...(row?.recent_runs ?? [])]),
     }),
   )
+  touch()
   return true
 }
 
@@ -142,11 +163,23 @@ export function requestTaskLoopStop(input: unknown) {
     updated_at: next.updated_at,
   })
   rows.set(out.child_session_id, out)
+  touch()
   return out
+}
+
+export function stopTaskLoopRun(input: unknown) {
+  const next = stop.parse(input)
+  const row = requestTaskLoopStop(next)
+  return {
+    row,
+    run: runs.get(next.child_session_id) ?? null,
+  }
 }
 
 export function clearTaskLoopRecord(input: unknown) {
   const id = ref.parse(input).child_session_id
-  runs.delete(id)
-  return rows.delete(id)
+  const run = runs.delete(id)
+  const ok = rows.delete(id)
+  if (run || ok) touch()
+  return ok
 }

@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": "workspace:*",
+    "@opentui/solid": "0.1.97",
+    "solid-js": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

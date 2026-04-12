@@ -1,12 +1,2 @@
-import type { TuiPlugin, TuiPluginModule } from "@opencode-ai/plugin/tui"
-
-const id = "opencode-task-loop"
-
-export const tui: TuiPlugin = async () => {}
-
-const mod: TuiPluginModule & { id: string } = {
-  id,
-  tui,
-}
-
-export default mod
+export * from "./tui/index.js"
+export { default } from "./tui/index.js"
