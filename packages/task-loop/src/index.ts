@@ -1,11 +1,11 @@
 import type { Plugin, PluginModule } from "@opencode-ai/plugin"
-import { taskLoopTool } from "./tool/task-loop.js"
+import { createTaskLoopTool } from "./tool/task-loop.js"
 
 const id = "opencode-task-loop"
 
-export const server: Plugin = async () => ({
+export const server: Plugin = async (input) => ({
   tool: {
-    task_loop: taskLoopTool,
+    task_loop: createTaskLoopTool(input.client),
   },
 })
 

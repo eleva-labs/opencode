@@ -1,5 +1,26 @@
 import { z } from "zod"
-import { taskLoopError, taskLoopStatus, taskLoopStopWhen } from "../tool/task-loop.js"
+
+const taskLoopStopWhen = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("explicit_text"),
+    value: z.string().min(1),
+  }),
+])
+
+const taskLoopStatus = z.enum(["running", "completed", "stopped", "aborted", "needs_resume", "failed"])
+
+const taskLoopError = z.object({
+  category: z.enum([
+    "invalid_args",
+    "resume_mismatch",
+    "stop_locked",
+    "missing_transcript",
+    "conflict",
+    "child_error",
+    "internal_error",
+  ]),
+  message: z.string().min(1),
+})
 
 const open = "<task_loop>"
 const close = "</task_loop>"
@@ -17,7 +38,7 @@ export const taskLoopTranscriptItem = z.object({
 
 export const taskLoopStop = z.object({
   should_stop: z.boolean(),
-  reason: z.enum(["stop_condition_met", "max_iterations_reached", "model_requested_stop"]),
+  reason: z.enum(["stop_condition_met", "max_iterations_reached"]),
 })
 
 const taskLoopContinue = z.object({
@@ -30,7 +51,6 @@ const taskLoopStopInput = z.object({
   max_iterations: z.number().int().min(1),
   assistant_text: z.string().default(""),
   stop_when: taskLoopStopWhen.optional(),
-  model_stop: z.boolean().default(false),
 })
 
 export const taskLoopResume = z.object({
@@ -71,19 +91,35 @@ export function formatTaskLoopSummary(text: string) {
   return out
 }
 
+export function formatTaskLoopResult(input: unknown) {
+  const args = z
+    .object({
+      task_id: z.string().min(1),
+      child_session_id: z.string().min(1),
+      iteration: z.number().int().min(1),
+      status: taskLoopStatus,
+      summary: z.string().optional(),
+      reason: z.string().optional(),
+    })
+    .parse(input)
+
+  return JSON.stringify({
+    ok: true,
+    task_id: args.task_id,
+    child_session_id: args.child_session_id,
+    iteration: args.iteration,
+    status: args.status,
+    summary: args.summary,
+    reason: args.reason,
+  })
+}
+
 export function evaluateTaskLoopStop(input: unknown) {
   const args = taskLoopStopInput.parse(input)
   if (args.iteration >= args.max_iterations) {
     return taskLoopStop.parse({
       should_stop: true,
       reason: "max_iterations_reached",
-    })
-  }
-
-  if (args.stop_when?.type === "model_signal" && args.model_stop) {
-    return taskLoopStop.parse({
-      should_stop: true,
-      reason: "model_requested_stop",
     })
   }
 

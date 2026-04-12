@@ -1,5 +1,44 @@
 import { z } from "zod"
-import { taskLoopError, taskLoopRecord } from "../tool/task-loop.js"
+
+const taskLoopStatus = z.enum(["running", "completed", "stopped", "aborted", "needs_resume", "failed"])
+
+const taskLoopStopWhen = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("explicit_text"),
+    value: z.string().min(1),
+  }),
+])
+
+const taskLoopError = z.object({
+  category: z.enum([
+    "invalid_args",
+    "resume_mismatch",
+    "stop_locked",
+    "missing_transcript",
+    "conflict",
+    "child_error",
+    "internal_error",
+  ]),
+  message: z.string().min(1),
+})
+
+const taskLoopRecord = z.object({
+  task_id: z.string().min(1),
+  loop_id: z.string().min(1),
+  parent_session_id: z.string().min(1),
+  parent_message_id: z.string().min(1),
+  child_session_id: z.string().min(1),
+  agent: z.string().min(1),
+  status: taskLoopStatus,
+  iteration: z.number().int().min(0),
+  max_iterations: z.number().int().min(1),
+  description: z.string().min(1),
+  stop_when: taskLoopStopWhen.optional(),
+  updated_at: z.number().int().nonnegative(),
+  summary: z.string().optional(),
+  last_error: z.string().optional(),
+  stop_locked: z.boolean().default(false),
+})
 
 const task = new Map<string, z.infer<typeof taskLoopRecord>>()
 const child = new Map<string, string>()
@@ -52,6 +91,10 @@ function fail(category: z.infer<typeof taskLoopError>["category"], message: stri
     ok: false as const,
     error: taskLoopError.parse({ category, message }),
   }
+}
+
+function terminal(status: z.infer<typeof taskLoopStatus>, locked: boolean) {
+  return locked || ["stopped", "completed", "aborted", "failed"].includes(status)
 }
 
 function guard(row: z.infer<typeof taskLoopRecord>) {
@@ -110,11 +153,12 @@ export function setTaskLoopRecord(input: unknown) {
   const next = taskLoopRecord.parse(input)
   const row = load({ task_id: next.task_id })
   const out =
-    row && (row.stop_locked || row.status === "stopped")
+    row && terminal(row.status, row.stop_locked)
       ? taskLoopRecord.parse({
           ...next,
-          status: "stopped",
-          stop_locked: true,
+          status: row.status === "stopped" ? "stopped" : row.status,
+          stop_locked: row.stop_locked || row.status === "stopped",
+          last_error: next.last_error ?? row.last_error,
         })
       : next
   return sync(out)
@@ -139,8 +183,8 @@ export function startTaskLoopRun(input: unknown) {
   if (row.child_session_id !== run.child_session_id) {
     return fail("resume_mismatch", "Cached loop record does not match the supplied child_session_id")
   }
-  if (row.stop_locked || row.status === "stopped") {
-    return fail("stop_locked", "Stopped task loops cannot start a new active run")
+  if (terminal(row.status, row.stop_locked)) {
+    return fail("stop_locked", "Terminal task loops cannot start a new active run")
   }
 
   const runhit = active.get(run.child_session_id)
@@ -183,6 +227,52 @@ export function setTaskLoopSummary(input: unknown) {
     taskLoopRecord.parse({
       ...row,
       summary: args.summary,
+      updated_at: args.updated_at,
+    }),
+  )
+}
+
+export function setTaskLoopError(input: unknown) {
+  const args = z
+    .object({
+      task_id: z.string().min(1),
+      status: z.enum(["aborted", "failed"]),
+      last_error: z.string().min(1),
+      updated_at: z.number().int().nonnegative(),
+      summary: z.string().optional(),
+    })
+    .parse(input)
+  const row = load({ task_id: args.task_id })
+  if (!row) return null
+  return sync(
+    taskLoopRecord.parse({
+      ...row,
+      status: args.status,
+      last_error: args.last_error,
+      summary: args.summary ?? row.summary,
+      updated_at: args.updated_at,
+    }),
+  )
+}
+
+export function setTaskLoopStatus(input: unknown) {
+  const args = z
+    .object({
+      task_id: z.string().min(1),
+      status: z.enum(["running", "completed", "needs_resume"]),
+      iteration: z.number().int().min(0).optional(),
+      summary: z.string().optional(),
+      updated_at: z.number().int().nonnegative(),
+    })
+    .parse(input)
+  const row = load({ task_id: args.task_id })
+  if (!row) return null
+  return sync(
+    taskLoopRecord.parse({
+      ...row,
+      status: args.status,
+      iteration: args.iteration ?? row.iteration,
+      summary: args.summary ?? row.summary,
       updated_at: args.updated_at,
     }),
   )
