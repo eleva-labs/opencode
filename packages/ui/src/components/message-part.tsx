@@ -468,7 +468,7 @@ function taskSession(
     .sort((a, b) => (b.time.created ?? 0) - (a.time.created ?? 0))[0]?.id
 }
 
-function childSession(metadata: Record<string, any>) {
+export function childSession(metadata: Record<string, any>) {
   if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
   if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
 }

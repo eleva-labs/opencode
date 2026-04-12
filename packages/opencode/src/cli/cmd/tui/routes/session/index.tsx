@@ -1978,7 +1978,7 @@ function WebSearch(props: ToolProps<any>) {
   )
 }
 
-function child(metadata: Record<string, any>) {
+export function child(metadata: Record<string, any>) {
   if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
   if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
 }

@@ -701,18 +701,22 @@ function ToolFooter(props: { time: number }) {
   )
 }
 
+export function shareTaskTitle(tool: string) {
+  return tool === "task_loop" ? "Task loop" : "Task"
+}
+
+export function shareTaskTarget(input: Record<string, unknown>, metadata: Record<string, unknown>) {
+  if (typeof input.description === "string" && input.description) return input.description
+  if (typeof metadata.description === "string" && metadata.description) return metadata.description
+  if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
+  return ""
+}
+
 function TaskTool(props: ToolProps) {
   const messages = useShareMessages()
-  const title = createMemo(() => (props.tool === "task_loop" ? "Task loop" : "Task"))
-  const target = createMemo(() => {
-    if (typeof props.state.input.description === "string" && props.state.input.description)
-      return props.state.input.description
-    if (typeof props.state.metadata?.description === "string" && props.state.metadata.description)
-      return props.state.metadata.description
-    const id = props.state.metadata?.sessionId ?? props.state.metadata?.child_session_id
-    if (typeof id === "string") return id
-    return ""
-  })
+  const title = createMemo(() => shareTaskTitle(props.tool))
+  const target = createMemo(() => shareTaskTarget(props.state.input, props.state.metadata ?? {}))
   const prompt = createMemo(() => props.state.input.prompt ?? props.state.input.initial_prompt ?? "")
 
   return (
