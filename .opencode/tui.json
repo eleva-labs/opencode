@@ -1,6 +1,7 @@
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
+    "./tui-plugins/task-loop.ts",
     [
       "./plugins/tui-smoke.tsx",
       {
