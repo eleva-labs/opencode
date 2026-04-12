@@ -98,26 +98,8 @@ export function startTaskLoopRun(input: unknown) {
     return fail("Only one active controller may own a child session in MVP")
   }
 
-  const row = rows.get(next.child_session_id)
   const active = taskLoopActive.parse(next)
   runs.set(active.child_session_id, active)
-  rows.set(
-    active.child_session_id,
-    taskLoopRecord.parse({
-      child_session_id: active.child_session_id,
-      parent_session_id: row?.parent_session_id ?? "pending",
-      parent_message_id: row?.parent_message_id ?? "pending",
-      status: "running",
-      iteration: row?.iteration ?? 0,
-      max_iterations: row?.max_iterations ?? 1,
-      updated_at: active.started_at,
-      summary: row?.summary,
-      last_text: row?.last_text,
-      last_error: row?.last_error,
-      stop_requested: false,
-      recent_runs: row?.recent_runs ?? [],
-    }),
-  )
   return {
     ok: true as const,
     value: active,

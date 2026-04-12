@@ -39,6 +39,14 @@ export const taskLoopMeta = z.object({
   child_session_id: z.string().min(1).optional(),
 })
 
+export const taskLoopView = z.object({
+  child_session_id: z.string().min(1),
+  status: z.string().min(1),
+  iteration: z.number().int().min(0),
+  max_iterations: z.number().int().min(1),
+  summary: z.string().default(""),
+})
+
 export function parseTaskLoopArgs(input: unknown) {
   return taskLoopArgs.parse(input)
 }
@@ -49,4 +57,26 @@ export function classifyTaskLoop(input: unknown) {
     mode: args.child_session_id ? "new_run_on_existing_session" : "new_run_on_new_session",
     child_session_id: args.child_session_id,
   })
+}
+
+export function getTaskLoopTitle(input: unknown) {
+  const args = taskLoopArgs.parse(input)
+  return args.description ?? "Task loop"
+}
+
+export function getTaskLoopMetaView(input: unknown) {
+  const args = taskLoopView.parse(input)
+  const title = `Task loop · ${args.status}`
+  return {
+    title,
+    metadata: {
+      sessionId: args.child_session_id,
+      child_session_id: args.child_session_id,
+      iteration: args.iteration,
+      max_iterations: args.max_iterations,
+      status: args.status,
+      title,
+      description: args.summary || title,
+    },
+  }
 }
