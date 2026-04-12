@@ -48,18 +48,16 @@ export const server: Plugin = async (input) => {
           const args = parseTaskLoopArgs(raw)
           const mode = classifyTaskLoop(args)
           const title = getTaskLoopTitle(args)
-          const created = !args.child_session_id
-            ? await input.client.session.create({
-                body: {
-                  parentID: ctx.sessionID,
-                  title,
-                },
-              })
-            : undefined
+          const created = await input.client.session.create({
+            body: {
+              parentID: ctx.sessionID,
+              title,
+            },
+          })
 
           if (created?.error) throw fail("session_create_failed", JSON.stringify(created.error))
 
-          const id = args.child_session_id ?? created?.data?.id
+          const id = created?.data?.id
           if (!id) throw fail("session_create_failed", "Missing child session id")
 
           const run = crypto.randomUUID()

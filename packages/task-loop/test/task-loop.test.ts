@@ -246,7 +246,7 @@ describe("task-loop server", () => {
       { id: "child-new", text: "step one" },
       { id: "child-new", text: "continue" },
     ])
-    expect(out).toContain("child_session_id: child-new")
+    expect(out).not.toContain("child_session_id")
     expect(out).toContain("status: completed")
     expect(out).toContain("iteration: 2/3")
     expect(run.meta[0]).toEqual(
@@ -271,7 +271,7 @@ describe("task-loop server", () => {
     expect(getTaskLoopRun({ child_session_id: "child-new" })).toBeNull()
   })
 
-  test("runs a fresh follow-up on an existing child session", async () => {
+  test("always creates a new child session for each run", async () => {
     const creates: string[] = []
     const prompts: Array<{ id: string; text: string }> = []
     const execute = await tool(
@@ -287,7 +287,7 @@ describe("task-loop server", () => {
       }),
     )
     const run = ctx()
-    mark("child-existing")
+    mark("unexpected")
 
     const out = await execute.execute(
       {
@@ -295,26 +295,25 @@ describe("task-loop server", () => {
         continuation_prompt: "resume more",
         max_iterations: 2,
         completion: { marker: "[DONE]" },
-        child_session_id: "child-existing",
       },
       run.value as never,
     )
 
-    expect(creates).toEqual([])
-    expect(prompts).toEqual([{ id: "child-existing", text: "resume" }])
-    expect(out).toContain("child_session_id: child-existing")
+    expect(creates).toEqual(["Task loop"])
+    expect(prompts).toEqual([{ id: "unexpected", text: "resume" }])
+    expect(out).not.toContain("child_session_id")
     expect(run.meta[0]).toEqual(
       getTaskLoopMetaView({
-        child_session_id: "child-existing",
+        child_session_id: "unexpected",
         status: "running",
         iteration: 0,
         max_iterations: 2,
-        summary: "new_run_on_existing_session",
+        summary: "new_run_on_new_session",
       }),
     )
   })
 
-  test("rejects a second controller for the same child session", async () => {
+  test("rejects a second controller for the created child session", async () => {
     mark("child-busy")
     setTaskLoopRecord({
       child_session_id: "child-busy",
@@ -332,7 +331,11 @@ describe("task-loop server", () => {
       child_session_id: "child-busy",
       started_at: 1,
     })
-    const execute = await tool()
+    const execute = await tool(
+      client({
+        create: async () => ({ data: { id: "child-busy" } }),
+      }),
+    )
 
     try {
       await execute.execute(
@@ -341,7 +344,6 @@ describe("task-loop server", () => {
           continuation_prompt: "continue",
           max_iterations: 2,
           completion: { marker: "[DONE]" },
-          child_session_id: "child-busy",
         },
         ctx().value as never,
       )
