@@ -1,8 +1,8 @@
 import { z } from "zod"
 
-export const taskLoopCompletion = z.object({
-  marker: z.string().min(1),
-})
+export { taskLoopCompletion, taskLoopRun, taskLoopStatus, taskLoopStep, taskLoopStopReason } from "../loop/schema.js"
+
+import { taskLoopCompletion } from "../loop/schema.js"
 
 export const taskLoopArgs = z.object({
   initial_prompt: z.string().min(1),
@@ -12,30 +12,6 @@ export const taskLoopArgs = z.object({
   child_session_id: z.string().min(1).optional(),
   subagent_type: z.string().min(1).optional(),
   description: z.string().min(3).max(120).optional(),
-})
-
-export const taskLoopStatus = z.enum(["running", "completed", "max_iterations", "stopped", "aborted", "failed"])
-
-export const taskLoopStep = z.object({
-  iteration: z.number().int().min(1),
-  child_session_id: z.string().min(1),
-  assistant_text: z.string().default(""),
-  should_stop: z.boolean(),
-  reason: z.enum(["completion_reported", "max_iterations_reached", "operator_stop", "aborted", "error"]),
-})
-
-export const taskLoopRun = z.object({
-  run_id: z.string().min(1),
-  parent_session_id: z.string().min(1),
-  parent_message_id: z.string().min(1),
-  child_session_id: z.string().min(1),
-  status: taskLoopStatus,
-  iteration: z.number().int().min(0),
-  max_iterations: z.number().int().min(1),
-  updated_at: z.number().int().nonnegative(),
-  summary: z.string().optional(),
-  last_text: z.string().optional(),
-  last_error: z.string().optional(),
 })
 
 export const taskLoopRouteParams = z.object({

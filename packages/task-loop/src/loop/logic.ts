@@ -1,221 +1,61 @@
 import { z } from "zod"
 
-const taskLoopStopWhen = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("explicit_text"),
-    value: z.string().min(1),
-  }),
-])
+import { taskLoopCompletion } from "./schema.js"
 
-const taskLoopStatus = z.enum(["running", "completed", "stopped", "aborted", "needs_resume", "failed"])
-
-const taskLoopError = z.object({
-  category: z.enum([
-    "invalid_args",
-    "resume_mismatch",
-    "stop_locked",
-    "missing_transcript",
-    "conflict",
-    "child_error",
-    "internal_error",
-  ]),
-  message: z.string().min(1),
-})
-
-const open = "<task_loop>"
-const close = "</task_loop>"
-
-export const taskLoopEnvelope = z.object({
-  loop_id: z.string().min(1),
-  task_id: z.string().min(1),
-  iteration: z.number().int().min(1),
-})
-
-export const taskLoopTranscriptItem = z.object({
-  role: z.string().min(1).optional(),
-  text: z.string().default(""),
-})
-
-export const taskLoopStop = z.object({
-  should_stop: z.boolean(),
-  reason: z.enum(["stop_condition_met", "max_iterations_reached"]),
-})
-
-const taskLoopContinue = z.object({
-  should_stop: z.literal(false),
-  reason: z.undefined().optional(),
-})
-
-const taskLoopStopInput = z.object({
+const stop = z.object({
   iteration: z.number().int().min(1),
   max_iterations: z.number().int().min(1),
   assistant_text: z.string().default(""),
-  stop_when: taskLoopStopWhen.optional(),
+  completion: taskLoopCompletion,
+  stop_requested: z.boolean().default(false),
 })
 
-export const taskLoopResume = z.object({
-  task_id: z.string().min(1),
-  child_session_id: z.string().min(1),
-  max_iterations: z.number().int().min(1),
-  loop_id: z.string().min(1).optional(),
-  items: z.array(taskLoopTranscriptItem),
+export const taskLoopDecision = z.object({
+  should_stop: z.boolean(),
+  reason: z.enum(["completion_reported", "max_iterations_reached", "operator_stop", "continue"]),
 })
 
-export function formatTaskLoopEnvelope(input: unknown) {
-  return `${open}${JSON.stringify(taskLoopEnvelope.parse(input))}${close}`
+export function hasTaskLoopCompletion(input: unknown) {
+  const args = z
+    .object({
+      assistant_text: z.string().default(""),
+      completion: taskLoopCompletion,
+    })
+    .parse(input)
+  return args.assistant_text.includes(args.completion.marker)
 }
 
-export function parseTaskLoopEnvelope(text: string) {
-  const start = text.indexOf(open)
-  const end = text.indexOf(close)
-  if (start === -1 || end === -1 || end <= start) return null
-  const json = text.slice(start + open.length, end).trim()
-  let raw: unknown
-  try {
-    raw = JSON.parse(json)
-  } catch {
-    return null
+export function evaluateTaskLoopStop(input: unknown) {
+  const args = stop.parse(input)
+  if (args.stop_requested) {
+    return taskLoopDecision.parse({
+      should_stop: true,
+      reason: "operator_stop",
+    })
   }
-  const hit = taskLoopEnvelope.safeParse(raw)
-  if (!hit.success) return null
-  return hit.data
-}
 
-function tagged(text: string) {
-  return text.includes(open) || text.includes(close)
+  if (hasTaskLoopCompletion(args)) {
+    return taskLoopDecision.parse({
+      should_stop: true,
+      reason: "completion_reported",
+    })
+  }
+
+  if (args.iteration >= args.max_iterations) {
+    return taskLoopDecision.parse({
+      should_stop: true,
+      reason: "max_iterations_reached",
+    })
+  }
+
+  return taskLoopDecision.parse({
+    should_stop: false,
+    reason: "continue",
+  })
 }
 
 export function formatTaskLoopSummary(text: string) {
   const out = text.replaceAll(/\s+/g, " ").trim().slice(0, 280)
   if (!out) return ""
   return out
-}
-
-export function formatTaskLoopResult(input: unknown) {
-  const args = z
-    .object({
-      task_id: z.string().min(1),
-      child_session_id: z.string().min(1),
-      iteration: z.number().int().min(1),
-      status: taskLoopStatus,
-      summary: z.string().optional(),
-      reason: z.string().optional(),
-    })
-    .parse(input)
-
-  return JSON.stringify({
-    ok: true,
-    task_id: args.task_id,
-    child_session_id: args.child_session_id,
-    iteration: args.iteration,
-    status: args.status,
-    summary: args.summary,
-    reason: args.reason,
-  })
-}
-
-export function evaluateTaskLoopStop(input: unknown) {
-  const args = taskLoopStopInput.parse(input)
-  if (args.iteration >= args.max_iterations) {
-    return taskLoopStop.parse({
-      should_stop: true,
-      reason: "max_iterations_reached",
-    })
-  }
-
-  if (args.stop_when?.type === "explicit_text" && args.assistant_text.includes(args.stop_when.value)) {
-    return taskLoopStop.parse({
-      should_stop: true,
-      reason: "stop_condition_met",
-    })
-  }
-
-  return taskLoopContinue.parse({
-    should_stop: false,
-  })
-}
-
-function list(items: z.infer<typeof taskLoopTranscriptItem>[], task: string, loop?: string) {
-  const rows = items.flatMap((item, index) => {
-    const env = parseTaskLoopEnvelope(item.text)
-    if (!env || env.task_id !== task) return []
-    if (loop && env.loop_id !== loop) return []
-    return [{ env, index }]
-  })
-
-  if (rows.length) {
-    return {
-      ok: true as const,
-      value: rows,
-    }
-  }
-
-  if (items.some((item) => tagged(item.text))) {
-    return {
-      ok: false as const,
-      error: taskLoopError.parse({
-        category: "missing_transcript",
-        message: "Transcript contains malformed task_loop envelope content and cannot prove resume state",
-      }),
-    }
-  }
-
-  return {
-    ok: true as const,
-    value: rows,
-  }
-}
-
-function pick(items: z.infer<typeof taskLoopTranscriptItem>[], start: number, end: number) {
-  return items.slice(start, end).find((item) => item.role === "assistant" && formatTaskLoopSummary(item.text))
-}
-
-export function reconstructTaskLoopState(input: unknown) {
-  const args = taskLoopResume.parse(input)
-  const rows = list(args.items, args.task_id, args.loop_id)
-  if (!rows.ok) {
-    return rows
-  }
-  if (!rows.value.length) {
-    return {
-      ok: false as const,
-      error: taskLoopError.parse({
-        category: "missing_transcript",
-        message: "Transcript evidence for the supplied task_id was not found in the child session",
-      }),
-    }
-  }
-
-  const ids = [...new Set(rows.value.map((row) => row.env.loop_id))]
-  if (ids.length !== 1) {
-    return {
-      ok: false as const,
-      error: taskLoopError.parse({
-        category: "resume_mismatch",
-        message: "Transcript evidence maps the supplied task_id to more than one loop_id",
-      }),
-    }
-  }
-
-  const summary = rows.value
-    .map((row, index) => pick(args.items, row.index + 1, rows.value[index + 1]?.index ?? args.items.length))
-    .filter((item): item is z.infer<typeof taskLoopTranscriptItem> => Boolean(item))
-    .map((item) => formatTaskLoopSummary(item.text))
-    .filter(Boolean)
-    .at(-1)
-
-  const iteration = rows.value.length
-  const status = taskLoopStatus.parse(iteration >= args.max_iterations ? "completed" : "needs_resume")
-
-  return {
-    ok: true as const,
-    value: {
-      task_id: args.task_id,
-      child_session_id: args.child_session_id,
-      loop_id: ids[0],
-      iteration,
-      summary,
-      status,
-    },
-  }
 }

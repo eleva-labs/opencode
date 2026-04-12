@@ -1,304 +1,170 @@
 import { z } from "zod"
 
-const taskLoopStatus = z.enum(["running", "completed", "stopped", "aborted", "needs_resume", "failed"])
+import { taskLoopRun, taskLoopStatus } from "./schema.js"
 
-const taskLoopStopWhen = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("explicit_text"),
-    value: z.string().min(1),
-  }),
-])
+const keep = 10
 
-const taskLoopError = z.object({
-  category: z.enum([
-    "invalid_args",
-    "resume_mismatch",
-    "stop_locked",
-    "missing_transcript",
-    "conflict",
-    "child_error",
-    "internal_error",
-  ]),
-  message: z.string().min(1),
-})
-
-const taskLoopRecord = z.object({
-  task_id: z.string().min(1),
-  loop_id: z.string().min(1),
+export const taskLoopRecord = z.object({
+  child_session_id: z.string().min(1),
   parent_session_id: z.string().min(1),
   parent_message_id: z.string().min(1),
-  child_session_id: z.string().min(1),
-  agent: z.string().min(1),
   status: taskLoopStatus,
   iteration: z.number().int().min(0),
   max_iterations: z.number().int().min(1),
-  description: z.string().min(1),
-  stop_when: taskLoopStopWhen.optional(),
   updated_at: z.number().int().nonnegative(),
   summary: z.string().optional(),
+  last_text: z.string().optional(),
   last_error: z.string().optional(),
-  stop_locked: z.boolean().default(false),
+  stop_requested: z.boolean().default(false),
+  recent_runs: z.array(taskLoopRun).default([]),
 })
 
-const task = new Map<string, z.infer<typeof taskLoopRecord>>()
-const child = new Map<string, string>()
-const loop = new Map<string, string>()
-const active = new Map<string, z.infer<typeof taskLoopRun>>()
-
-export const taskLoopRun = z.object({
+export const taskLoopActive = z.object({
   run_id: z.string().min(1),
-  task_id: z.string().min(1),
   child_session_id: z.string().min(1),
   started_at: z.number().int().nonnegative(),
 })
 
-const taskLoopRef = z
-  .object({
-    task_id: z.string().min(1).optional(),
-    child_session_id: z.string().min(1).optional(),
-    loop_id: z.string().min(1).optional(),
-  })
-  .refine((input) => Boolean(input.task_id || input.child_session_id || input.loop_id), {
-    message: "A task_id, child_session_id, or loop_id is required",
-  })
+const ref = z.object({
+  child_session_id: z.string().min(1),
+})
 
-const taskLoopRunStart = z.object({
+const start = z.object({
   run_id: z.string().min(1),
-  task_id: z.string().min(1),
   child_session_id: z.string().min(1),
   started_at: z.number().int().nonnegative(),
 })
 
-const taskLoopRunStop = z.object({
-  run_id: z.string().min(1),
+const finish = taskLoopRun.extend({
+  stop_requested: z.boolean().optional(),
+})
+
+const stop = z.object({
   child_session_id: z.string().min(1),
-})
-
-const taskLoopSummary = z.object({
-  task_id: z.string().min(1),
-  summary: z.string().optional(),
   updated_at: z.number().int().nonnegative(),
 })
 
-const taskLoopStop = z.object({
-  task_id: z.string().min(1),
-  updated_at: z.number().int().nonnegative(),
-  summary: z.string().optional(),
-})
+const rows = new Map<string, z.infer<typeof taskLoopRecord>>()
+const runs = new Map<string, z.infer<typeof taskLoopActive>>()
 
-function fail(category: z.infer<typeof taskLoopError>["category"], message: string) {
+function fail(message: string) {
   return {
     ok: false as const,
-    error: taskLoopError.parse({ category, message }),
+    error: message,
   }
 }
 
-function terminal(status: z.infer<typeof taskLoopStatus>, locked: boolean) {
-  return locked || ["stopped", "completed", "aborted", "failed"].includes(status)
+function sort(list: z.infer<typeof taskLoopRun>[]) {
+  return [...list].sort((a, b) => b.updated_at - a.updated_at).slice(0, keep)
 }
 
-function guard(row: z.infer<typeof taskLoopRecord>) {
-  const kid = child.get(row.child_session_id)
-  if (kid && kid !== row.task_id) {
-    return fail("conflict", "child_session_id cannot be rebound to a different task_id without teardown")
-  }
-
-  const lid = loop.get(row.loop_id)
-  if (lid && lid !== row.task_id) {
-    return fail("conflict", "loop_id cannot be rebound to a different task_id without teardown")
-  }
-
-  return null
-}
-
-function unbind(row: z.infer<typeof taskLoopRecord>) {
-  child.delete(row.child_session_id)
-  loop.delete(row.loop_id)
-}
-
-function sync(row: z.infer<typeof taskLoopRecord>) {
-  const err = guard(row)
-  if (err) return err
-  const prev = task.get(row.task_id)
-  if (prev) unbind(prev)
-  task.set(row.task_id, row)
-  child.set(row.child_session_id, row.task_id)
-  loop.set(row.loop_id, row.task_id)
-  if (prev && prev.child_session_id !== row.child_session_id) {
-    const run = active.get(prev.child_session_id)
-    if (run && run.task_id === row.task_id) {
-      active.delete(prev.child_session_id)
-      active.set(
-        row.child_session_id,
-        taskLoopRun.parse({
-          ...run,
-          child_session_id: row.child_session_id,
-        }),
-      )
-    }
-  }
-  return {
-    ok: true as const,
-    value: row,
-  }
-}
-
-function load(ref: z.infer<typeof taskLoopRef>) {
-  const task_id = ref.task_id ?? child.get(ref.child_session_id ?? "") ?? loop.get(ref.loop_id ?? "")
-  if (!task_id) return null
-  return task.get(task_id) ?? null
+function patch(input: z.infer<typeof taskLoopRecord>, prev?: z.infer<typeof taskLoopRecord>) {
+  return taskLoopRecord.parse({
+    ...prev,
+    ...input,
+    child_session_id: input.child_session_id,
+    recent_runs: input.recent_runs.length ? sort(input.recent_runs) : (prev?.recent_runs ?? []),
+  })
 }
 
 export function setTaskLoopRecord(input: unknown) {
   const next = taskLoopRecord.parse(input)
-  const row = load({ task_id: next.task_id })
-  const out =
-    row && terminal(row.status, row.stop_locked)
-      ? taskLoopRecord.parse({
-          ...next,
-          status: row.status === "stopped" ? "stopped" : row.status,
-          stop_locked: row.stop_locked || row.status === "stopped",
-          last_error: next.last_error ?? row.last_error,
-        })
-      : next
-  return sync(out)
+  const prev = rows.get(next.child_session_id)
+  const row = patch(next, prev)
+  rows.set(row.child_session_id, row)
+  return row
 }
 
 export function getTaskLoopRecord(input: unknown) {
-  return load(taskLoopRef.parse(input))
+  return rows.get(ref.parse(input).child_session_id) ?? null
 }
 
 export function listTaskLoopRecords() {
-  return [...task.values()].sort((a, b) => b.updated_at - a.updated_at)
+  return [...rows.values()].sort((a, b) => b.updated_at - a.updated_at)
+}
+
+export function listTaskLoopRuns(input: unknown) {
+  return getTaskLoopRecord(input)?.recent_runs ?? []
 }
 
 export function getTaskLoopRun(input: unknown) {
-  return active.get(z.object({ child_session_id: z.string().min(1) }).parse(input).child_session_id) ?? null
+  return runs.get(ref.parse(input).child_session_id) ?? null
 }
 
 export function startTaskLoopRun(input: unknown) {
-  const run = taskLoopRunStart.parse(input)
-  const row = load({ task_id: run.task_id })
-  if (!row) return fail("resume_mismatch", "No cached loop record exists for the supplied task_id")
-  if (row.child_session_id !== run.child_session_id) {
-    return fail("resume_mismatch", "Cached loop record does not match the supplied child_session_id")
-  }
-  if (terminal(row.status, row.stop_locked)) {
-    return fail("stop_locked", "Terminal task loops cannot start a new active run")
+  const next = start.parse(input)
+  const hit = runs.get(next.child_session_id)
+  if (hit && hit.run_id !== next.run_id) {
+    return fail("Only one active controller may own a child session in MVP")
   }
 
-  const runhit = active.get(run.child_session_id)
-  if (runhit && runhit.run_id !== run.run_id) {
-    return fail("conflict", "Only one active controller may own a child session in MVP")
-  }
-
-  active.set(run.child_session_id, taskLoopRun.parse(run))
-  const rowhit = sync(
+  const row = rows.get(next.child_session_id)
+  const active = taskLoopActive.parse(next)
+  runs.set(active.child_session_id, active)
+  rows.set(
+    active.child_session_id,
     taskLoopRecord.parse({
-      ...row,
+      child_session_id: active.child_session_id,
+      parent_session_id: row?.parent_session_id ?? "pending",
+      parent_message_id: row?.parent_message_id ?? "pending",
       status: "running",
-      updated_at: run.started_at,
+      iteration: row?.iteration ?? 0,
+      max_iterations: row?.max_iterations ?? 1,
+      updated_at: active.started_at,
+      summary: row?.summary,
+      last_text: row?.last_text,
+      last_error: row?.last_error,
+      stop_requested: false,
+      recent_runs: row?.recent_runs ?? [],
     }),
   )
-  if (!rowhit.ok) {
-    active.delete(run.child_session_id)
-    return rowhit
-  }
-
   return {
     ok: true as const,
-    value: active.get(run.child_session_id)!,
+    value: active,
   }
 }
 
 export function finishTaskLoopRun(input: unknown) {
-  const run = taskLoopRunStop.parse(input)
-  const hit = active.get(run.child_session_id)
-  if (!hit || hit.run_id !== run.run_id) return false
-  active.delete(run.child_session_id)
+  const next = finish.parse(input)
+  const hit = runs.get(next.child_session_id)
+  if (!hit || hit.run_id !== next.run_id) return false
+  runs.delete(next.child_session_id)
+  const row = rows.get(next.child_session_id)
+  rows.set(
+    next.child_session_id,
+    taskLoopRecord.parse({
+      child_session_id: next.child_session_id,
+      parent_session_id: next.parent_session_id,
+      parent_message_id: next.parent_message_id,
+      status: next.status,
+      iteration: next.iteration,
+      max_iterations: next.max_iterations,
+      updated_at: next.updated_at,
+      summary: next.summary,
+      last_text: next.last_text,
+      last_error: next.last_error,
+      stop_requested: next.stop_requested ?? false,
+      recent_runs: sort([next, ...(row?.recent_runs ?? [])]),
+    }),
+  )
   return true
 }
 
-export function setTaskLoopSummary(input: unknown) {
-  const args = taskLoopSummary.parse(input)
-  const row = load({ task_id: args.task_id })
+export function requestTaskLoopStop(input: unknown) {
+  const next = stop.parse(input)
+  const row = rows.get(next.child_session_id)
   if (!row) return null
-  return sync(
-    taskLoopRecord.parse({
-      ...row,
-      summary: args.summary,
-      updated_at: args.updated_at,
-    }),
-  )
-}
-
-export function setTaskLoopError(input: unknown) {
-  const args = z
-    .object({
-      task_id: z.string().min(1),
-      status: z.enum(["aborted", "failed"]),
-      last_error: z.string().min(1),
-      updated_at: z.number().int().nonnegative(),
-      summary: z.string().optional(),
-    })
-    .parse(input)
-  const row = load({ task_id: args.task_id })
-  if (!row) return null
-  return sync(
-    taskLoopRecord.parse({
-      ...row,
-      status: args.status,
-      last_error: args.last_error,
-      summary: args.summary ?? row.summary,
-      updated_at: args.updated_at,
-    }),
-  )
-}
-
-export function setTaskLoopStatus(input: unknown) {
-  const args = z
-    .object({
-      task_id: z.string().min(1),
-      status: z.enum(["running", "completed", "needs_resume"]),
-      iteration: z.number().int().min(0).optional(),
-      summary: z.string().optional(),
-      updated_at: z.number().int().nonnegative(),
-    })
-    .parse(input)
-  const row = load({ task_id: args.task_id })
-  if (!row) return null
-  return sync(
-    taskLoopRecord.parse({
-      ...row,
-      status: args.status,
-      iteration: args.iteration ?? row.iteration,
-      summary: args.summary ?? row.summary,
-      updated_at: args.updated_at,
-    }),
-  )
-}
-
-export function lockTaskLoopStop(input: unknown) {
-  const args = taskLoopStop.parse(input)
-  const row = load({ task_id: args.task_id })
-  if (!row) return null
-  return sync(
-    taskLoopRecord.parse({
-      ...row,
-      status: "stopped",
-      stop_locked: true,
-      summary: args.summary ?? row.summary,
-      updated_at: args.updated_at,
-    }),
-  )
+  const out = taskLoopRecord.parse({
+    ...row,
+    stop_requested: true,
+    updated_at: next.updated_at,
+  })
+  rows.set(out.child_session_id, out)
+  return out
 }
 
 export function clearTaskLoopRecord(input: unknown) {
-  const row = load(taskLoopRef.parse(input))
-  if (!row) return false
-  task.delete(row.task_id)
-  child.delete(row.child_session_id)
-  loop.delete(row.loop_id)
-  active.delete(row.child_session_id)
-  return true
+  const id = ref.parse(input).child_session_id
+  runs.delete(id)
+  return rows.delete(id)
 }
