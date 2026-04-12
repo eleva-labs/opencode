@@ -12,7 +12,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/index.ts",
+    "./server": "./src/server.ts",
     "./tui": "./src/tui.ts",
     "./tool": "./src/tool/task-loop.ts",
     "./package.json": "./package.json"
