@@ -416,7 +416,7 @@ describe("task-loop compatibility helpers", () => {
       title: "Task loop · completed",
       metadata: {
         sessionId: "child-meta",
-        child_session_id: "child-meta",
+        childSessionId: "child-meta",
         iteration: 2,
         max_iterations: 5,
         status: "completed",
@@ -434,15 +434,15 @@ describe("task-loop compatibility helpers", () => {
     ])
 
     expect(session.includes('typeof metadata.sessionId === "string" && metadata.sessionId')).toBe(true)
-    expect(session.includes('typeof metadata.child_session_id === "string" && metadata.child_session_id')).toBe(true)
+    expect(session.includes('typeof metadata.childSessionId === "string" && metadata.childSessionId')).toBe(true)
     expect(session.includes('props.part.tool === "task" || props.part.tool === "task_loop"')).toBe(true)
     expect(ui.includes('case "task_loop"')).toBe(true)
     expect(ui.includes('typeof metadata.sessionId === "string" && metadata.sessionId')).toBe(true)
-    expect(ui.includes('typeof metadata.child_session_id === "string" && metadata.child_session_id')).toBe(true)
+    expect(ui.includes('typeof metadata.childSessionId === "string" && metadata.childSessionId')).toBe(true)
     expect(web.includes('props.part.tool === "task" || props.part.tool === "task_loop"')).toBe(true)
     expect(web.includes("export function shareTaskTitle")).toBe(true)
     expect(web.includes("export function shareTaskTarget")).toBe(true)
     expect(web.includes('typeof metadata.sessionId === "string" && metadata.sessionId')).toBe(true)
-    expect(web.includes('typeof metadata.child_session_id === "string" && metadata.child_session_id')).toBe(true)
+    expect(web.includes('typeof metadata.childSessionId === "string" && metadata.childSessionId')).toBe(true)
   })
 })

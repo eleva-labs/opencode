@@ -470,6 +470,7 @@ function taskSession(
 
 export function childSession(metadata: Record<string, any>) {
   if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.childSessionId === "string" && metadata.childSessionId) return metadata.childSessionId
   if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
 }
 
@@ -1322,16 +1323,18 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   // @ts-expect-error
   const partMetadata = () => part().state?.metadata ?? emptyMetadata
   const taskId = createMemo(() => {
-    if (part().tool !== "task") return
+    if (part().tool !== "task" && part().tool !== "task_loop") return
     const value = partMetadata().sessionId
     if (typeof value === "string" && value) return value
+    const child = partMetadata().childSessionId
+    if (typeof child === "string" && child) return child
   })
   const taskHref = createMemo(() => {
-    if (part().tool !== "task") return
+    if (part().tool !== "task" && part().tool !== "task_loop") return
     return sessionLink(taskId(), useLocation().pathname, data.sessionHref)
   })
   const taskSubtitle = createMemo(() => {
-    if (part().tool !== "task") return undefined
+    if (part().tool !== "task" && part().tool !== "task_loop") return undefined
     const value = input().description
     if (typeof value === "string" && value) return value
     return taskId()

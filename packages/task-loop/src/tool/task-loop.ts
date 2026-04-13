@@ -66,7 +66,7 @@ export function getTaskLoopMetaView(input: unknown) {
     title,
     metadata: {
       sessionId: args.child_session_id,
-      child_session_id: args.child_session_id,
+      childSessionId: args.child_session_id,
       iteration: args.iteration,
       max_iterations: args.max_iterations,
       status: args.status,

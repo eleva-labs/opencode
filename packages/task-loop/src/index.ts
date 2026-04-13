@@ -38,6 +38,24 @@ function text(input: unknown) {
   )
 }
 
+async function prompt(input: Parameters<Plugin>[0], id: string, agent: string, text: string) {
+  const res = await fetch(new URL(`/session/${id}/message`, input.serverUrl), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      agent,
+      parts: [{ type: "text", text }],
+    }),
+  })
+  return await res.json()
+}
+
+async function abort(input: Parameters<Plugin>[0], id: string) {
+  await fetch(new URL(`/session/${id}/abort`, input.serverUrl), {
+    method: "POST",
+  })
+}
+
 export const server: Plugin = async (input) => {
   return {
     tool: {
@@ -111,7 +129,7 @@ export const server: Plugin = async (input) => {
           }
 
           const stop = () => {
-            void input.client.session.abort({ path: { id } })
+            void abort(input, id)
           }
 
           ctx.abort.addEventListener("abort", stop)
@@ -138,18 +156,12 @@ export const server: Plugin = async (input) => {
                 throw fail("aborted", err)
               }
 
-              const res = await input.client.session.prompt({
-                path: { id },
-                body: {
-                  agent: args.subagent_type ?? ctx.agent,
-                  parts: [
-                    {
-                      type: "text",
-                      text: i === 1 ? args.initial_prompt : args.continuation_prompt,
-                    },
-                  ],
-                },
-              })
+              const res = await prompt(
+                input,
+                id,
+                args.subagent_type ?? ctx.agent,
+                i === 1 ? args.initial_prompt : args.continuation_prompt,
+              )
 
               if (res.error) {
                 const status = ctx.abort.aborted ? "aborted" : "failed"
@@ -224,7 +236,6 @@ export const server: Plugin = async (input) => {
               if (!step.should_stop) continue
 
               return formatTaskLoopOutput({
-                child_session_id: id,
                 status,
                 iteration: i,
                 max_iterations: args.max_iterations,
@@ -240,7 +251,6 @@ export const server: Plugin = async (input) => {
             }
 
             return formatTaskLoopOutput({
-              child_session_id: id,
               status: out.status,
               iteration: out.iteration,
               max_iterations: args.max_iterations,

@@ -709,6 +709,7 @@ export function shareTaskTarget(input: Record<string, unknown>, metadata: Record
   if (typeof input.description === "string" && input.description) return input.description
   if (typeof metadata.description === "string" && metadata.description) return metadata.description
   if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.childSessionId === "string" && metadata.childSessionId) return metadata.childSessionId
   if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
   return ""
 }
