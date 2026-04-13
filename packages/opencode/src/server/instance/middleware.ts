@@ -3,15 +3,14 @@ import type { UpgradeWebSocket } from "hono/ws"
 import { getAdaptor } from "@/control-plane/adaptors"
 import { WorkspaceID } from "@/control-plane/schema"
 import { Workspace } from "@/control-plane/workspace"
-import { ServerProxy } from "./proxy"
-import { lazy } from "@/util/lazy"
+import { ServerProxy } from "../proxy"
 import { Filesystem } from "@/util/filesystem"
 import { Instance } from "@/project/instance"
 import { InstanceBootstrap } from "@/project/bootstrap"
-import { InstanceRoutes } from "./instance"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
+import { AppRuntime } from "@/effect/app-runtime"
 
 type Rule = { method?: string; path: string; exact?: boolean; action: "local" | "forward" }
 
@@ -47,9 +46,7 @@ async function getSessionWorkspace(url: URL) {
 }
 
 export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): MiddlewareHandler {
-  const routes = lazy(() => InstanceRoutes(upgrade))
-
-  return async (c) => {
+  return async (c, next) => {
     const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || process.cwd()
     const directory = Filesystem.resolve(
       (() => {
@@ -70,9 +67,9 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
     if (!workspaceID) {
       return Instance.provide({
         directory,
-        init: InstanceBootstrap,
+        init: () => AppRuntime.runPromise(InstanceBootstrap),
         async fn() {
-          return routes().fetch(c.req.raw, c.env)
+          return next()
         },
       })
     }
@@ -87,7 +84,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
       // The lets the `DELETE /session/:id` endpoint through and we've
       // made sure that it will run without an instance
       if (url.pathname.match(/\/session\/[^/]+$/) && c.req.method === "DELETE") {
-        return routes().fetch(c.req.raw, c.env)
+        return next()
       }
 
       return new Response(`Workspace not found: ${workspaceID}`, {
@@ -107,9 +104,9 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
         fn: () =>
           Instance.provide({
             directory: target.directory,
-            init: InstanceBootstrap,
+            init: () => AppRuntime.runPromise(InstanceBootstrap),
             async fn() {
-              return routes().fetch(c.req.raw, c.env)
+              return next()
             },
           }),
       })
@@ -118,7 +115,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
     if (local(c.req.method, url.pathname)) {
       // No instance provided because we are serving cached data; there
       // is no instance to work with
-      return routes().fetch(c.req.raw, c.env)
+      return next()
     }
 
     if (c.req.header("upgrade")?.toLowerCase() === "websocket") {

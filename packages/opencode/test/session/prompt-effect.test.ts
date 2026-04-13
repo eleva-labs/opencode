@@ -31,6 +31,7 @@ import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionStatus } from "../../src/session/status"
 import { Skill } from "../../src/skill"
+import { SystemPrompt } from "../../src/session/system"
 import { Shell } from "../../src/shell/shell"
 import { Snapshot } from "../../src/snapshot"
 import { ToolRegistry } from "../../src/tool/registry"
@@ -193,6 +194,7 @@ function makeHttp() {
       Layer.provideMerge(registry),
       Layer.provideMerge(trunc),
       Layer.provide(Instruction.defaultLayer),
+      Layer.provide(SystemPrompt.defaultLayer),
       Layer.provideMerge(deps),
     ),
   )
@@ -202,7 +204,7 @@ const it = testEffect(makeHttp())
 const unix = process.platform !== "win32" ? it.live : it.live.skip
 
 // Config that registers a custom "test" provider with a "test-model" model
-// so Provider.getModel("test", "test-model") succeeds inside the loop.
+// so provider model lookup succeeds inside the loop.
 const cfg = {
   provider: {
     test: {
