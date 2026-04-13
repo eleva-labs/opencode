@@ -111,7 +111,7 @@ export const server: Plugin = async (input) => {
             recent_runs: row?.recent_runs ?? [],
           })
 
-          ctx.metadata(
+          await ctx.metadata(
             getTaskLoopMetaView({
               child_session_id: id,
               status: "running",
@@ -151,7 +151,7 @@ export const server: Plugin = async (input) => {
                   updated_at: Date.now(),
                   last_error: err,
                 }
-                ctx.metadata(
+                await ctx.metadata(
                   getTaskLoopMetaView({
                     child_session_id: id,
                     status: out.status,
@@ -181,7 +181,7 @@ export const server: Plugin = async (input) => {
                   summary: out.summary,
                   last_error: err,
                 }
-                ctx.metadata(
+                await ctx.metadata(
                   getTaskLoopMetaView({
                     child_session_id: id,
                     status,
@@ -230,7 +230,7 @@ export const server: Plugin = async (input) => {
                 recent_runs: [],
               })
 
-              ctx.metadata(
+              await ctx.metadata(
                 getTaskLoopMetaView({
                   child_session_id: id,
                   status,

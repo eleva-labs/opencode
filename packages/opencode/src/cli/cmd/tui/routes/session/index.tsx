@@ -1519,7 +1519,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
 
   const toolprops = {
     get metadata() {
-      return props.part.state.status === "pending" ? {} : (props.part.state.metadata ?? {})
+      return (props.part.state as any).metadata ?? {}
     },
     get input() {
       return props.part.state.input ?? {}
@@ -1980,6 +1980,7 @@ function WebSearch(props: ToolProps<any>) {
 
 export function child(metadata: Record<string, any>) {
   if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.childSessionId === "string" && metadata.childSessionId) return metadata.childSessionId
   if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
 }
 

@@ -137,7 +137,7 @@ export namespace ToolRegistry {
                   let meta: { title?: string; metadata?: Record<string, any> } = {}
                   const pluginCtx: PluginToolContext = {
                     ...toolCtx,
-                    metadata: (input) => {
+                    metadata: async (input) => {
                       meta = {
                         title: input.title ?? meta.title,
                         metadata: {
@@ -145,7 +145,7 @@ export namespace ToolRegistry {
                           ...(input.metadata ?? {}),
                         },
                       }
-                      return toolCtx.metadata(input)
+                      return await Effect.runPromise(toolCtx.metadata(input))
                     },
                     ask: (req) => toolCtx.ask(req),
                     directory: ctx.directory,
