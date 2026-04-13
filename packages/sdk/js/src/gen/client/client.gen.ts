@@ -20,6 +20,17 @@ type ReqInit = Omit<RequestInit, "body" | "headers"> & {
 export const createClient = (config: Config = {}): Client => {
   let _config = mergeConfigs(createConfig(), config)
 
+  const normalize = (options: RequestOptions) => {
+    if (!(options as any).sessionID) return options
+    if ((options as any).path?.id) return options
+    if (!options.url?.includes("/session/{id}")) return options
+    const { sessionID, ...rest } = options as any
+    return {
+      ...rest,
+      path: { ...(rest.path ?? {}), id: sessionID },
+    }
+  }
+
   const getConfig = (): Config => ({ ..._config })
 
   const setConfig = (config: Config): Config => {
@@ -30,6 +41,7 @@ export const createClient = (config: Config = {}): Client => {
   const interceptors = createInterceptors<Request, Response, unknown, ResolvedRequestOptions>()
 
   const beforeRequest = async (options: RequestOptions) => {
+    options = normalize(options)
     const opts = {
       ..._config,
       ...options,

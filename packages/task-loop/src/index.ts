@@ -38,21 +38,28 @@ function text(input: unknown) {
   )
 }
 
+function core(input: Parameters<Plugin>[0]) {
+  return (input.client.session as any)._client ?? (input.client as any).client ?? (input.client as any)._client
+}
+
 async function prompt(input: Parameters<Plugin>[0], id: string, agent: string, text: string) {
-  const res = await fetch(new URL(`/session/${id}/message`, input.serverUrl), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const res = await core(input).post({
+    url: "/session/{id}/message",
+    path: { id },
+    body: {
       agent,
       parts: [{ type: "text", text }],
-    }),
+    },
+    parseAs: "json",
   })
-  return await res.json()
+  return res
 }
 
 async function abort(input: Parameters<Plugin>[0], id: string) {
-  await fetch(new URL(`/session/${id}/abort`, input.serverUrl), {
-    method: "POST",
+  await core(input).post({
+    url: "/session/{id}/abort",
+    path: { id },
+    parseAs: "json",
   })
 }
 
