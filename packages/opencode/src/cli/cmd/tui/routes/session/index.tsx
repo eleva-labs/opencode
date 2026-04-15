@@ -1379,7 +1379,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
           )
         }}
       </For>
-      <Show when={props.parts.some((x) => x.type === "tool" && x.tool === "task")}>
+      <Show when={props.parts.some((x) => x.type === "tool" && (x.tool === "task" || x.tool === "task_loop"))}>
         <box paddingTop={1} paddingLeft={3}>
           <text fg={theme.text}>
             {keybind.print("session_child_first")}
@@ -1519,7 +1519,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
 
   const toolprops = {
     get metadata() {
-      return props.part.state.status === "pending" ? {} : (props.part.state.metadata ?? {})
+      return (props.part.state as any).metadata ?? {}
     },
     get input() {
       return props.part.state.input ?? {}
@@ -1573,7 +1573,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={props.part.tool === "edit"}>
           <Edit {...toolprops} />
         </Match>
-        <Match when={props.part.tool === "task"}>
+        <Match when={props.part.tool === "task" || props.part.tool === "task_loop"}>
           <Task {...toolprops} />
         </Match>
         <Match when={props.part.tool === "apply_patch"}>
@@ -1978,16 +1978,22 @@ function WebSearch(props: ToolProps<any>) {
   )
 }
 
+export function child(metadata: Record<string, any>) {
+  if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.childSessionId === "string" && metadata.childSessionId) return metadata.childSessionId
+  if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
+}
+
 function Task(props: ToolProps<typeof TaskTool>) {
   const { navigate } = useRoute()
   const sync = useSync()
+  const id = createMemo(() => child(props.metadata as Record<string, any>))
 
   onMount(() => {
-    if (props.metadata.sessionId && !sync.data.message[props.metadata.sessionId]?.length)
-      sync.session.sync(props.metadata.sessionId)
+    if (id() && !sync.data.message[id()!]?.length) sync.session.sync(id()!)
   })
 
-  const messages = createMemo(() => sync.data.message[props.metadata.sessionId ?? ""] ?? [])
+  const messages = createMemo(() => sync.data.message[id() ?? ""] ?? [])
 
   const tools = createMemo(() => {
     return messages().flatMap((msg) =>
@@ -2009,8 +2015,20 @@ function Task(props: ToolProps<typeof TaskTool>) {
   })
 
   const content = createMemo(() => {
-    if (!props.input.description) return ""
-    let content = [`${Locale.titlecase(props.input.subagent_type ?? "General")} Task — ${props.input.description}`]
+    const title =
+      props.part.tool === "task_loop"
+        ? typeof (props.metadata as Record<string, any>).title === "string"
+          ? String((props.metadata as Record<string, any>).title)
+          : "Task loop"
+        : `${Locale.titlecase(props.input.subagent_type ?? "General")} Task`
+    const summary =
+      typeof props.input.description === "string" && props.input.description
+        ? props.input.description
+        : typeof (props.metadata as Record<string, any>).description === "string"
+          ? String((props.metadata as Record<string, any>).description)
+          : ""
+    if (!summary) return title
+    let content = [`${title} — ${summary}`]
 
     if (isRunning() && tools().length > 0) {
       // content[0] += ` · ${tools().length} toolcalls`
@@ -2033,8 +2051,8 @@ function Task(props: ToolProps<typeof TaskTool>) {
       pending="Delegating..."
       part={props.part}
       onClick={() => {
-        if (props.metadata.sessionId) {
-          navigate({ type: "session", sessionID: props.metadata.sessionId })
+        if (id()) {
+          navigate({ type: "session", sessionID: id()! })
         }
       }}
     >

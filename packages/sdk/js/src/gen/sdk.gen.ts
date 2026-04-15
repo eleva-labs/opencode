@@ -429,6 +429,16 @@ class Vcs extends _HeyApiClient {
 }
 
 class Session extends _HeyApiClient {
+  private session(options: Record<string, any>) {
+    if (options.path?.id) return options
+    if (!options.sessionID) return options
+    const { sessionID, ...rest } = options
+    return {
+      ...rest,
+      path: { ...(rest.path ?? {}), id: sessionID },
+    }
+  }
+
   /**
    * List all sessions
    */
@@ -467,6 +477,7 @@ class Session extends _HeyApiClient {
    * Delete a session and all its data
    */
   public delete<ThrowOnError extends boolean = false>(options: Options<SessionDeleteData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).delete<SessionDeleteResponses, SessionDeleteErrors, ThrowOnError>({
       url: "/session/{id}",
       ...options,
@@ -477,6 +488,7 @@ class Session extends _HeyApiClient {
    * Get session
    */
   public get<ThrowOnError extends boolean = false>(options: Options<SessionGetData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).get<SessionGetResponses, SessionGetErrors, ThrowOnError>({
       url: "/session/{id}",
       ...options,
@@ -487,6 +499,7 @@ class Session extends _HeyApiClient {
    * Update session properties
    */
   public update<ThrowOnError extends boolean = false>(options: Options<SessionUpdateData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).patch<SessionUpdateResponses, SessionUpdateErrors, ThrowOnError>({
       url: "/session/{id}",
       ...options,
@@ -501,6 +514,7 @@ class Session extends _HeyApiClient {
    * Get a session's children
    */
   public children<ThrowOnError extends boolean = false>(options: Options<SessionChildrenData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).get<SessionChildrenResponses, SessionChildrenErrors, ThrowOnError>({
       url: "/session/{id}/children",
       ...options,
@@ -511,6 +525,7 @@ class Session extends _HeyApiClient {
    * Get the todo list for a session
    */
   public todo<ThrowOnError extends boolean = false>(options: Options<SessionTodoData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).get<SessionTodoResponses, SessionTodoErrors, ThrowOnError>({
       url: "/session/{id}/todo",
       ...options,
@@ -521,6 +536,7 @@ class Session extends _HeyApiClient {
    * Analyze the app and create an AGENTS.md file
    */
   public init<ThrowOnError extends boolean = false>(options: Options<SessionInitData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionInitResponses, SessionInitErrors, ThrowOnError>({
       url: "/session/{id}/init",
       ...options,
@@ -535,6 +551,7 @@ class Session extends _HeyApiClient {
    * Fork an existing session at a specific message
    */
   public fork<ThrowOnError extends boolean = false>(options: Options<SessionForkData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionForkResponses, unknown, ThrowOnError>({
       url: "/session/{id}/fork",
       ...options,
@@ -549,6 +566,7 @@ class Session extends _HeyApiClient {
    * Abort a session
    */
   public abort<ThrowOnError extends boolean = false>(options: Options<SessionAbortData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionAbortResponses, SessionAbortErrors, ThrowOnError>({
       url: "/session/{id}/abort",
       ...options,
@@ -559,6 +577,7 @@ class Session extends _HeyApiClient {
    * Unshare the session
    */
   public unshare<ThrowOnError extends boolean = false>(options: Options<SessionUnshareData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).delete<SessionUnshareResponses, SessionUnshareErrors, ThrowOnError>({
       url: "/session/{id}/share",
       ...options,
@@ -569,6 +588,7 @@ class Session extends _HeyApiClient {
    * Share a session
    */
   public share<ThrowOnError extends boolean = false>(options: Options<SessionShareData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionShareResponses, SessionShareErrors, ThrowOnError>({
       url: "/session/{id}/share",
       ...options,
@@ -579,6 +599,7 @@ class Session extends _HeyApiClient {
    * Get the diff for this session
    */
   public diff<ThrowOnError extends boolean = false>(options: Options<SessionDiffData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).get<SessionDiffResponses, SessionDiffErrors, ThrowOnError>({
       url: "/session/{id}/diff",
       ...options,
@@ -589,6 +610,7 @@ class Session extends _HeyApiClient {
    * Summarize the session
    */
   public summarize<ThrowOnError extends boolean = false>(options: Options<SessionSummarizeData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionSummarizeResponses, SessionSummarizeErrors, ThrowOnError>({
       url: "/session/{id}/summarize",
       ...options,
@@ -603,6 +625,7 @@ class Session extends _HeyApiClient {
    * List messages for a session
    */
   public messages<ThrowOnError extends boolean = false>(options: Options<SessionMessagesData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).get<SessionMessagesResponses, SessionMessagesErrors, ThrowOnError>({
       url: "/session/{id}/message",
       ...options,
@@ -613,6 +636,7 @@ class Session extends _HeyApiClient {
    * Create and send a new message to a session
    */
   public prompt<ThrowOnError extends boolean = false>(options: Options<SessionPromptData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionPromptResponses, SessionPromptErrors, ThrowOnError>({
       url: "/session/{id}/message",
       ...options,
@@ -627,6 +651,7 @@ class Session extends _HeyApiClient {
    * Get a message from a session
    */
   public message<ThrowOnError extends boolean = false>(options: Options<SessionMessageData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).get<SessionMessageResponses, SessionMessageErrors, ThrowOnError>({
       url: "/session/{id}/message/{messageID}",
       ...options,
@@ -637,6 +662,7 @@ class Session extends _HeyApiClient {
    * Create and send a new message to a session, start if needed and return immediately
    */
   public promptAsync<ThrowOnError extends boolean = false>(options: Options<SessionPromptAsyncData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionPromptAsyncResponses, SessionPromptAsyncErrors, ThrowOnError>({
       url: "/session/{id}/prompt_async",
       ...options,
@@ -651,6 +677,7 @@ class Session extends _HeyApiClient {
    * Send a new command to a session
    */
   public command<ThrowOnError extends boolean = false>(options: Options<SessionCommandData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionCommandResponses, SessionCommandErrors, ThrowOnError>({
       url: "/session/{id}/command",
       ...options,
@@ -665,6 +692,7 @@ class Session extends _HeyApiClient {
    * Run a shell command
    */
   public shell<ThrowOnError extends boolean = false>(options: Options<SessionShellData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionShellResponses, SessionShellErrors, ThrowOnError>({
       url: "/session/{id}/shell",
       ...options,
@@ -679,6 +707,7 @@ class Session extends _HeyApiClient {
    * Revert a message
    */
   public revert<ThrowOnError extends boolean = false>(options: Options<SessionRevertData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionRevertResponses, SessionRevertErrors, ThrowOnError>({
       url: "/session/{id}/revert",
       ...options,
@@ -693,6 +722,7 @@ class Session extends _HeyApiClient {
    * Restore all reverted messages
    */
   public unrevert<ThrowOnError extends boolean = false>(options: Options<SessionUnrevertData, ThrowOnError>) {
+    options = this.session(options as any) as any
     return (options.client ?? this._client).post<SessionUnrevertResponses, SessionUnrevertErrors, ThrowOnError>({
       url: "/session/{id}/unrevert",
       ...options,

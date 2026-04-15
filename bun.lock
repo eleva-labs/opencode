@@ -530,6 +530,19 @@
         "vite": "catalog:",
       },
     },
+    "packages/task-loop": {
+      "name": "@opencode-ai/task-loop",
+      "version": "1.4.3",
+      "dependencies": {
+        "@opencode-ai/plugin": "workspace:*",
+        "@opentui/solid": "0.1.97",
+        "solid-js": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+      },
+    },
     "packages/ui": {
       "name": "@opencode-ai/ui",
       "version": "1.4.3",
@@ -1533,6 +1546,8 @@
     "@opencode-ai/slack": ["@opencode-ai/slack@workspace:packages/slack"],
 
     "@opencode-ai/storybook": ["@opencode-ai/storybook@workspace:packages/storybook"],
+
+    "@opencode-ai/task-loop": ["@opencode-ai/task-loop@workspace:packages/task-loop"],
 
     "@opencode-ai/ui": ["@opencode-ai/ui@workspace:packages/ui"],
 

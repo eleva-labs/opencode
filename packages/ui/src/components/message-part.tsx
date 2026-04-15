@@ -363,14 +363,15 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         title: i18n.t("ui.tool.codesearch"),
         subtitle: input.query,
       }
-    case "task": {
+    case "task":
+    case "task_loop": {
       const type =
         typeof input.subagent_type === "string" && input.subagent_type
           ? input.subagent_type[0]!.toUpperCase() + input.subagent_type.slice(1)
           : undefined
       return {
         icon: "task",
-        title: agentTitle(i18n, type),
+        title: tool === "task_loop" ? "Task loop" : agentTitle(i18n, type),
         subtitle: input.description,
       }
     }
@@ -465,6 +466,12 @@ function taskSession(
     .filter((session) => (description ? session.title.startsWith(description) : true))
     .filter((session) => (agent ? session.title.includes(`@${agent}`) : true))
     .sort((a, b) => (b.time.created ?? 0) - (a.time.created ?? 0))[0]?.id
+}
+
+export function childSession(metadata: Record<string, any>) {
+  if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.childSessionId === "string" && metadata.childSessionId) return metadata.childSessionId
+  if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
 }
 
 const CONTEXT_GROUP_TOOLS = new Set(["read", "glob", "grep", "list"])
@@ -1316,16 +1323,18 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   // @ts-expect-error
   const partMetadata = () => part().state?.metadata ?? emptyMetadata
   const taskId = createMemo(() => {
-    if (part().tool !== "task") return
+    if (part().tool !== "task" && part().tool !== "task_loop") return
     const value = partMetadata().sessionId
     if (typeof value === "string" && value) return value
+    const child = partMetadata().childSessionId
+    if (typeof child === "string" && child) return child
   })
   const taskHref = createMemo(() => {
-    if (part().tool !== "task") return
+    if (part().tool !== "task" && part().tool !== "task_loop") return
     return sessionLink(taskId(), useLocation().pathname, data.sessionHref)
   })
   const taskSubtitle = createMemo(() => {
-    if (part().tool !== "task") return undefined
+    if (part().tool !== "task" && part().tool !== "task_loop") return undefined
     const value = input().description
     if (typeof value === "string" && value) return value
     return taskId()
@@ -1744,8 +1753,8 @@ ToolRegistry.register({
     const i18n = useI18n()
     const location = useLocation()
     const childSessionId = createMemo(() => {
-      const value = props.metadata.sessionId
-      if (typeof value === "string" && value) return value
+      const value = childSession(props.metadata as Record<string, any>)
+      if (value) return value
       return taskSession(props.input, location.pathname, data.store.session, data.store.agent)
     })
     const agent = createMemo(() => taskAgent(props.input.subagent_type, data.store.agent))
@@ -1790,6 +1799,83 @@ ToolRegistry.register({
             </Show>
             <span data-component="task-tool-title" style={{ color: tone() ?? "var(--text-strong)" }}>
               {title()}
+            </span>
+            <Show when={subtitle()}>
+              <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
+            </Show>
+          </div>
+        </div>
+        <Show when={clickable()}>
+          <div data-component="task-tool-action">
+            <Icon name="square-arrow-top-right" size="small" />
+          </div>
+        </Show>
+      </div>
+    )
+
+    return (
+      <BasicTool
+        icon="task"
+        status={props.status}
+        trigger={trigger()}
+        hideDetails
+        triggerHref={href()}
+        clickable={clickable()}
+        onTriggerClick={navigate}
+      />
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "task_loop",
+  render(props) {
+    const data = useData()
+    const location = useLocation()
+    const childSessionId = createMemo(() => {
+      const value = childSession(props.metadata as Record<string, any>)
+      if (value) return value
+      return taskSession(props.input, location.pathname, data.store.session, data.store.agent)
+    })
+    const subtitle = createMemo(() => {
+      if (typeof props.input.description === "string" && props.input.description) return props.input.description
+      if (typeof props.metadata.description === "string" && props.metadata.description)
+        return props.metadata.description
+      return childSessionId()
+    })
+    const running = createMemo(() => props.status === "pending" || props.status === "running")
+    const href = createMemo(() => sessionLink(childSessionId(), location.pathname, data.sessionHref))
+    const clickable = createMemo(() => !!(childSessionId() && (data.navigateToSession || href())))
+
+    const open = () => {
+      const id = childSessionId()
+      if (!id) return
+      if (data.navigateToSession) {
+        data.navigateToSession(id)
+        return
+      }
+      const value = href()
+      if (value) window.location.assign(value)
+    }
+
+    const navigate = (event: MouseEvent) => {
+      if (!data.navigateToSession) return
+      if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      event.preventDefault()
+      open()
+    }
+
+    const trigger = () => (
+      <div data-component="task-tool-card">
+        <div data-slot="basic-tool-tool-info-structured">
+          <div data-slot="basic-tool-tool-info-main">
+            <Show when={running()}>
+              <span data-component="task-tool-spinner" style={{ color: "var(--icon-interactive-base)" }}>
+                <Spinner />
+              </span>
+            </Show>
+            <span data-component="task-tool-title" style={{ color: "var(--text-strong)" }}>
+              Task loop
             </span>
             <Show when={subtitle()}>
               <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>

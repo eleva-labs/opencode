@@ -2,6 +2,8 @@
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 - The default branch in this repo is `dev`.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+- Repo relationship: `anomalyco/opencode` is the original upstream, and `eleva-labs/opencode` is our fork.
+- When needed, add `https://github.com/anomalyco/opencode` as remote `upstream` and use `upstream/dev -> origin/dev -> current branch` for upstream sync checks.
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
 
 ## Style Guide

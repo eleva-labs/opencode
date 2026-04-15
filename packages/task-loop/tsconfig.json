@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "noUncheckedIndexedAccess": false,
+    "paths": {
+      "solid-js": ["../opencode/node_modules/solid-js"],
+      "solid-js/*": ["../opencode/node_modules/solid-js/*"],
+      "@opentui/solid": ["../opencode/node_modules/@opentui/solid"],
+      "@opentui/solid/*": ["../opencode/node_modules/@opentui/solid/*"]
+    }
+  },
+  "include": ["src"]
+}

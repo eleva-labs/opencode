@@ -133,8 +133,19 @@ export namespace ToolRegistry {
               description: def.description,
               execute: (args, toolCtx) =>
                 Effect.gen(function* () {
+                  let meta: { title?: string; metadata?: Record<string, any> } = {}
                   const pluginCtx: PluginToolContext = {
                     ...toolCtx,
+                    metadata: async (input) => {
+                      meta = {
+                        title: input.title ?? meta.title,
+                        metadata: {
+                          ...(meta.metadata ?? {}),
+                          ...(input.metadata ?? {}),
+                        },
+                      }
+                      return await Effect.runPromise(toolCtx.metadata(input))
+                    },
                     ask: (req) => toolCtx.ask(req),
                     directory: ctx.directory,
                     worktree: ctx.worktree,
@@ -143,9 +154,10 @@ export namespace ToolRegistry {
                   const agent = yield* Effect.promise(() => Agent.get(toolCtx.agent))
                   const out = yield* truncate.output(result, {}, agent)
                   return {
-                    title: "",
+                    title: meta.title ?? "",
                     output: out.truncated ? out.content : result,
                     metadata: {
+                      ...(meta.metadata ?? {}),
                       truncated: out.truncated,
                       outputPath: out.truncated ? out.outputPath : undefined,
                     },

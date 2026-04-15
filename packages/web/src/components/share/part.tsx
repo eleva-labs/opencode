@@ -114,7 +114,9 @@ export function Part(props: PartProps) {
               <Match when={props.part.type === "tool" && props.part.tool === "webfetch"}>
                 <IconGlobeAlt width={18} height={18} />
               </Match>
-              <Match when={props.part.type === "tool" && props.part.tool === "task"}>
+              <Match
+                when={props.part.type === "tool" && (props.part.tool === "task" || props.part.tool === "task_loop")}
+              >
                 <IconRobot width={18} height={18} />
               </Match>
               <Match when={true}>
@@ -264,7 +266,7 @@ export function Part(props: PartProps) {
                       state={props.part.state}
                     />
                   </Match>
-                  <Match when={props.part.tool === "task"}>
+                  <Match when={props.part.tool === "task" || props.part.tool === "task_loop"}>
                     <TaskTool
                       id={props.part.id}
                       tool={props.part.tool}
@@ -699,16 +701,34 @@ function ToolFooter(props: { time: number }) {
   )
 }
 
+export function shareTaskTitle(tool: string) {
+  return tool === "task_loop" ? "Task loop" : "Task"
+}
+
+export function shareTaskTarget(input: Record<string, unknown>, metadata: Record<string, unknown>) {
+  if (typeof input.description === "string" && input.description) return input.description
+  if (typeof metadata.description === "string" && metadata.description) return metadata.description
+  if (typeof metadata.sessionId === "string" && metadata.sessionId) return metadata.sessionId
+  if (typeof metadata.childSessionId === "string" && metadata.childSessionId) return metadata.childSessionId
+  if (typeof metadata.child_session_id === "string" && metadata.child_session_id) return metadata.child_session_id
+  return ""
+}
+
 function TaskTool(props: ToolProps) {
   const messages = useShareMessages()
+  const title = createMemo(() => shareTaskTitle(props.tool))
+  const target = createMemo(() => shareTaskTarget(props.state.input, props.state.metadata ?? {}))
+  const prompt = createMemo(() => props.state.input.prompt ?? props.state.input.initial_prompt ?? "")
 
   return (
     <>
       <div data-component="tool-title">
-        <span data-slot="name">Task</span>
-        <span data-slot="target">{props.state.input.description}</span>
+        <span data-slot="name">{title()}</span>
+        <span data-slot="target">{target()}</span>
       </div>
-      <div data-component="tool-input">&ldquo;{props.state.input.prompt}&rdquo;</div>
+      <Show when={prompt()}>
+        <div data-component="tool-input">&ldquo;{prompt()}&rdquo;</div>
+      </Show>
       <ResultsButton showCopy={messages.show_output} hideCopy={messages.hide_output}>
         <div data-component="tool-output">
           <ContentMarkdown expand text={props.state.output} />
