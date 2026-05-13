@@ -50,7 +50,7 @@ export const tui: TuiPlugin = async (api) => {
     },
   ])
 
-  api.command.register(() => {
+  api.command?.register(() => {
     const id = pick(api)
     const row = id ? listTaskLoopRecords().find((item) => item.child_session_id === id) : undefined
     return [
