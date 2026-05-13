@@ -23,18 +23,17 @@ type Usage = {
   }
 }
 
-export const oaCompatHelper: ProviderHelper = ({ adjustCacheUsage, safetyIdentifier }) => ({
+export const oaCompatHelper: ProviderHelper = ({ adjustCacheUsage }) => ({
   format: "oa-compat",
   modifyUrl: (providerApi: string) => providerApi + "/chat/completions",
   modifyHeaders: (headers: Headers, body: Record<string, any>, apiKey: string) => {
     headers.set("authorization", `Bearer ${apiKey}`)
     headers.set("x-session-affinity", headers.get("x-opencode-session") ?? "")
   },
-  modifyBody: (body: Record<string, any>, workspaceID?: string) => {
+  modifyBody: (body: Record<string, any>, _workspaceID?: string) => {
     return {
       ...body,
       ...(body.stream ? { stream_options: { include_usage: true } } : {}),
-      ...(safetyIdentifier ? { safety_identifier: safetyIdentifier } : {}),
     }
   },
   createBinaryStreamDecoder: () => undefined,
@@ -49,7 +48,7 @@ export const oaCompatHelper: ProviderHelper = ({ adjustCacheUsage, safetyIdentif
         let json
         try {
           json = JSON.parse(chunk.slice(6)) as { usage?: Usage }
-        } catch (e) {
+        } catch {
           return
         }
 
@@ -289,7 +288,7 @@ export function fromOaCompatibleResponse(resp: any): CommonResponse {
         index: 0,
         message: {
           role: "assistant" as const,
-          ...(content.length > 0 && content.some((c) => c.type === "text")
+          ...(content.some((c) => c.type === "text")
             ? {
                 content: content
                   .filter((c) => c.type === "text")
@@ -297,7 +296,7 @@ export function fromOaCompatibleResponse(resp: any): CommonResponse {
                   .join(""),
               }
             : {}),
-          ...(content.length > 0 && content.some((c) => c.type === "tool_use")
+          ...(content.some((c) => c.type === "tool_use")
             ? {
                 tool_calls: content
                   .filter((c) => c.type === "tool_use")
